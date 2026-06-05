@@ -1,4 +1,4 @@
-FeatureScript 2960; /* Automatically generated version */
+FeatureScript 2985; /* Automatically generated version */
 // This module is part of the FeatureScript Standard Library and is distributed under the MIT License.
 // See the LICENSE tab for the license text.
 // Copyright (c) 2013-Present PTC Inc.
@@ -55,5 +55,4 @@ export enum HolePositionReference
     UP_TO_NEXT,
     LAST_TARGET_START_IN_DEPTH
 }
-
 

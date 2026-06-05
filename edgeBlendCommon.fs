@@ -1,20 +1,20 @@
-FeatureScript 2960; /* Automatically generated version */
+FeatureScript 2985; /* Automatically generated version */
 // This module is part of the FeatureScript Standard Library and is distributed under the MIT License.
 // See the LICENSE tab for the license text.
 // Copyright (c) 2013-Present PTC Inc.
 
-import(path : "onshape/std/blendcontroltype.gen.fs", version : "2960.0");
-import(path : "onshape/std/chamfermethod.gen.fs", version : "2960.0");
-import(path : "onshape/std/chamfertype.gen.fs", version : "2960.0");
-import(path : "onshape/std/containers.fs", version : "2960.0");
-import(path : "onshape/std/edgeconvexitytype.gen.fs", version : "2960.0");
-import(path : "onshape/std/evaluate.fs", version : "2960.0");
-import(path : "onshape/std/feature.fs", version : "2960.0");
-import(path : "onshape/std/filletcrosssection.gen.fs", version : "2960.0");
-import(path : "onshape/std/manipulator.fs", version : "2960.0");
-import(path : "onshape/std/math.fs", version : "2960.0");
-import(path : "onshape/std/valueBounds.fs", version : "2960.0");
-import(path : "onshape/std/vector.fs", version : "2960.0");
+import(path : "onshape/std/blendcontroltype.gen.fs", version : "2985.0");
+import(path : "onshape/std/chamfermethod.gen.fs", version : "2985.0");
+import(path : "onshape/std/chamfertype.gen.fs", version : "2985.0");
+import(path : "onshape/std/containers.fs", version : "2985.0");
+import(path : "onshape/std/edgeconvexitytype.gen.fs", version : "2985.0");
+import(path : "onshape/std/evaluate.fs", version : "2985.0");
+import(path : "onshape/std/feature.fs", version : "2985.0");
+import(path : "onshape/std/filletcrosssection.gen.fs", version : "2985.0");
+import(path : "onshape/std/manipulator.fs", version : "2985.0");
+import(path : "onshape/std/math.fs", version : "2985.0");
+import(path : "onshape/std/valueBounds.fs", version : "2985.0");
+import(path : "onshape/std/vector.fs", version : "2985.0");
 
 /**
 *   @internal
@@ -213,4 +213,3 @@ function findRadiusToOffsetRatio(normalArray is array) returns number
 {
     return (1.0 / cos(0.5 * angleBetween(normalArray[0], normalArray[1]))) - 1.0;
 }
-

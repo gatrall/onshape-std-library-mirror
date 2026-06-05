@@ -1,17 +1,17 @@
-FeatureScript 2960; /* Automatically generated version */
+FeatureScript 2985; /* Automatically generated version */
 // This module is part of the FeatureScript Standard Library and is distributed under the MIT License.
 // See the LICENSE tab for the license text.
 // Copyright (c) 2013-Present PTC Inc.
 
 // Imports used in interface
-export import(path : "onshape/std/query.fs", version : "2960.0");
+export import(path : "onshape/std/query.fs", version : "2985.0");
 
 // Imports used internally
-import(path : "onshape/std/evaluate.fs", version : "2960.0");
-import(path : "onshape/std/feature.fs", version : "2960.0");
-import(path : "onshape/std/geomOperations.fs", version : "2960.0");
-import(path : "onshape/std/valueBounds.fs", version : "2960.0");
-import(path : "onshape/std/vector.fs", version : "2960.0");
+import(path : "onshape/std/evaluate.fs", version : "2985.0");
+import(path : "onshape/std/feature.fs", version : "2985.0");
+import(path : "onshape/std/geomOperations.fs", version : "2985.0");
+import(path : "onshape/std/valueBounds.fs", version : "2985.0");
+import(path : "onshape/std/vector.fs", version : "2985.0");
 
 /**
  * @internal
@@ -73,4 +73,3 @@ export const cPoint = defineFeature(function(context is Context, id is Id, defin
         }
         opPoint(context, id, definition);
     }, { pointType: PointType.EDGE_POINT, parameter: 0.5, x: 0 * meter, y: 0 * meter, z: 0 * meter });
-
