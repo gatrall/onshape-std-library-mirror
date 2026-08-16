@@ -19,13 +19,13 @@ jobs:
     timeout-minutes: 45
     steps:
       - name: Check out automation
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: automation
           path: automation
 
       - name: Check out release history
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: main
           fetch-depth: 0
