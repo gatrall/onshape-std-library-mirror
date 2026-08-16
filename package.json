@@ -1,0 +1,8 @@
+{
+  "name": "onshape-std-library-mirror-automation",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs"
+  }
+}

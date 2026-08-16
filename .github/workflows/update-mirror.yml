@@ -1,0 +1,86 @@
+name: Update Onshape standard library mirror
+
+on:
+  schedule:
+    - cron: "30 23 * * 5"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: update-onshape-standard-library
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out automation
+        uses: actions/checkout@v4
+        with:
+          ref: automation
+          path: automation
+
+      - name: Check out release history
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          path: mirror
+
+      - name: Test importer
+        run: npm test --prefix automation
+
+      - name: Check changelog, source workspace, and named releases
+        id: import
+        env:
+          ONSHAPE_ACCESS_KEY: ${{ secrets.ONSHAPE_ACCESS_KEY }}
+          ONSHAPE_SECRET_KEY: ${{ secrets.ONSHAPE_SECRET_KEY }}
+        shell: bash
+        run: |
+          set +e
+          node automation/tools/import.mjs --repo "$GITHUB_WORKSPACE/mirror" --json > result.json
+          status=$?
+          set -e
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          jq . result.json >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Push validated release commits
+        if: steps.import.outputs.status == '0'
+        shell: bash
+        run: |
+          ahead="$(git -C mirror rev-list --count origin/main..HEAD)"
+          if [[ "$ahead" -gt 0 ]]; then
+            git -C mirror push origin HEAD:main
+          else
+            echo "No named FeatureScript release to publish." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Open or update attention issue
+        if: steps.import.outputs.status != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh label create mirror-attention --repo "$GITHUB_REPOSITORY" --color D93F0B --description "Standard library mirror requires attention" --force
+          issue="$(gh issue list --repo "$GITHUB_REPOSITORY" --label mirror-attention --state open --json number --jq '.[0].number // empty')"
+          if [[ -n "$issue" ]]; then
+            gh issue edit "$issue" --repo "$GITHUB_REPOSITORY" --title "Standard library mirror requires attention" --body-file result.json
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "Standard library mirror requires attention" --label mirror-attention --body-file result.json
+          fi
+          exit "${{ steps.import.outputs.status }}"
+
+      - name: Close resolved attention issue
+        if: steps.import.outputs.status == '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          issue="$(gh issue list --repo "$GITHUB_REPOSITORY" --label mirror-attention --state open --json number --jq '.[0].number // empty')"
+          if [[ -n "$issue" ]]; then
+            gh issue close "$issue" --repo "$GITHUB_REPOSITORY" --comment "The changelog, latest named version, canonical workspace, and mirror are back in agreement."
+          fi
