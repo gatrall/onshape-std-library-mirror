@@ -241,10 +241,7 @@ async function fetchElementContent(client, selector, element) {
   return client.request(`/blobelements${prefix}`, { binary: true });
 }
 
-async function downloadRelease(client, version) {
-  const selector = `v/${version.id}`;
-  const rawElements = await client.request(`/documents/d/${STANDARD_LIBRARY.documentId}/${selector}/elements`);
-  const elements = elementArray(rawElements, `${version.name} elements`);
+function validateInventory(version, elements) {
   const featureStudios = elements.filter((element) => element.elementType === "FEATURESTUDIO");
   const blobs = elements.filter((element) => element.elementType === "BLOB");
   if (featureStudios.length < 250 || blobs.length !== 2 || elements.length !== featureStudios.length + blobs.length) {
@@ -252,10 +249,39 @@ async function downloadRelease(client, version) {
   }
   const filenames = elements.map(releaseFilename);
   if (new Set(filenames).size !== filenames.length) throw new Error(`${version.name} contains duplicate output filenames.`);
+  return { featureStudios, blobs, filenames };
+}
+
+export function changedElementNames(previousElements, elements) {
+  const previousByName = new Map(previousElements.map((element) => [element.name, element]));
+  return elements
+    .filter((element) => {
+      const previous = previousByName.get(element.name);
+      return !previous
+        || previous.elementType !== element.elementType
+        || previous.dataType !== element.dataType
+        || previous.microversionId !== element.microversionId
+        || releaseFilename(previous) !== releaseFilename(element);
+    })
+    .map((element) => element.name)
+    .sort((a, b) => a.localeCompare(b));
+}
+
+async function downloadRelease(client, version, { elements, previousElements, previousDirectory }) {
+  const selector = `v/${version.id}`;
+  const { featureStudios, blobs, filenames } = validateInventory(version, elements);
+  const previousByName = new Map(previousElements.map((element) => [element.name, element]));
+  const changed = new Set(changedElementNames(previousElements, elements));
   const directory = await mkdtemp(join(tmpdir(), `onshape-stdlib-${version.name}-`));
   try {
     await mapConcurrent(elements, 8, async (element, index) => {
-      const content = await fetchElementContent(client, selector, element);
+      const previous = previousByName.get(element.name);
+      let content;
+      if (!changed.has(element.name) && previous) {
+        content = await readFile(join(previousDirectory, releaseFilename(previous)));
+      } else {
+        content = await fetchElementContent(client, selector, element);
+      }
       if (element.elementType === "FEATURESTUDIO") {
         validateFeatureStudioSource(content.toString("utf8"), version.name, filenames[index]);
       }
@@ -267,7 +293,14 @@ async function downloadRelease(client, version) {
     if (normalizedCommonVersion !== version.name) {
       throw new Error(`${version.name} common.fs declares FeatureScript ${commonVersion ?? "missing"}.`);
     }
-    return { directory, elements, featureStudios: featureStudios.length, blobs: blobs.length };
+    return {
+      directory,
+      elements,
+      featureStudios: featureStudios.length,
+      blobs: blobs.length,
+      downloadedElements: changed.size,
+      reusedElements: elements.length - changed.size,
+    };
   } catch (error) {
     await rm(directory, { recursive: true, force: true });
     throw error;
@@ -311,17 +344,13 @@ async function hashChangedElement(client, selector, element) {
   return sha256(await fetchElementContent(client, selector, element));
 }
 
-async function checkWorkspaceDrift(client, latestVersion) {
+async function checkWorkspaceDrift(client, latestVersion, versionElements) {
   const workspacesRaw = await client.request(`/documents/d/${STANDARD_LIBRARY.documentId}/workspaces`);
   const workspaces = elementArray(workspacesRaw, "workspaces");
   const workspace = workspaces.find((entry) => entry.id === STANDARD_LIBRARY.workspaceId);
   if (!workspace) throw new Error(`Canonical workspace ${STANDARD_LIBRARY.workspaceId} was not found.`);
-  const [workspaceRaw, versionRaw] = await Promise.all([
-    client.request(`/documents/d/${STANDARD_LIBRARY.documentId}/w/${STANDARD_LIBRARY.workspaceId}/elements`),
-    client.request(`/documents/d/${STANDARD_LIBRARY.documentId}/v/${latestVersion.id}/elements`),
-  ]);
+  const workspaceRaw = await client.request(`/documents/d/${STANDARD_LIBRARY.documentId}/w/${STANDARD_LIBRARY.workspaceId}/elements`);
   const workspaceElements = elementArray(workspaceRaw, "workspace elements");
-  const versionElements = elementArray(versionRaw, "version elements");
   const changed = compareElementInventories(workspaceElements, versionElements);
   if (workspace.parent !== latestVersion.id || changed.length > 0) {
     const details = await mapConcurrent(changed, 4, async (entry) => ({
@@ -353,7 +382,9 @@ export async function importReleases({ repo, client, changelogHtml, dryRun = fal
 
   const changelog = parseChangelog(changelogHtml);
   const versionsRaw = await client.request(`/documents/d/${STANDARD_LIBRARY.documentId}/versions`);
-  const versions = elementArray(versionsRaw, "versions").filter((version) => /^\d+\.0$/.test(version.name));
+  const versions = elementArray(versionsRaw, "versions")
+    .filter((version) => /^\d+\.0$/.test(version.name))
+    .sort((left, right) => compareFeatureScriptVersions(left.name, right.name));
   if (versions.length < 100) throw new Error(`Canonical version list returned only ${versions.length} numeric releases.`);
   const latestVersion = versions.at(-1);
   const mirrorVersion = currentMirrorVersion(absoluteRepo);
@@ -371,12 +402,30 @@ export async function importReleases({ repo, client, changelogHtml, dryRun = fal
     });
   }
 
-  const workspace = await checkWorkspaceDrift(client, latestVersion);
+  const latestElementsRaw = await client.request(`/documents/d/${STANDARD_LIBRARY.documentId}/v/${latestVersion.id}/elements`);
+  const latestElements = elementArray(latestElementsRaw, `${latestVersion.name} elements`);
+  validateInventory(latestVersion, latestElements);
+  const workspace = await checkWorkspaceDrift(client, latestVersion, latestElements);
+  let previousElements;
+  if (mirrorVersionId === latestVersion.id) {
+    previousElements = latestElements;
+  } else {
+    const previousRaw = await client.request(`/documents/d/${STANDARD_LIBRARY.documentId}/v/${mirrorVersionId}/elements`);
+    previousElements = elementArray(previousRaw, `${mirrorVersion} elements`);
+    validateInventory({ name: mirrorVersion }, previousElements);
+  }
+  let previousDirectory = absoluteRepo;
   const imported = [];
   const downloads = [];
   try {
     for (const entry of matched) {
-      const release = await downloadRelease(client, entry.version);
+      const elements = entry.version.id === latestVersion.id
+        ? latestElements
+        : elementArray(
+          await client.request(`/documents/d/${STANDARD_LIBRARY.documentId}/v/${entry.version.id}/elements`),
+          `${entry.version.name} elements`,
+        );
+      const release = await downloadRelease(client, entry.version, { elements, previousElements, previousDirectory });
       downloads.push(release.directory);
       if (!dryRun) await commitRelease(absoluteRepo, entry.version, entry.changelog, release);
       imported.push({
@@ -385,7 +434,11 @@ export async function importReleases({ repo, client, changelogHtml, dryRun = fal
         changelog: entry.changelog,
         featureStudios: release.featureStudios,
         blobs: release.blobs,
+        downloadedElements: release.downloadedElements,
+        reusedElements: release.reusedElements,
       });
+      previousElements = release.elements;
+      previousDirectory = release.directory;
     }
   } finally {
     await Promise.all(downloads.map((directory) => rm(directory, { recursive: true, force: true })));
