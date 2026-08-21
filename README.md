@@ -1,12 +1,23 @@
 # Onshape Standard Library Mirror Automation
 
-This branch contains the automation that maintains the `main` branch of
+> [!IMPORTANT]
+> This API-based mirror is deprecated and its scheduled workflow is disabled.
+> Use
+> [`h0witzer/Onshape-Standard-Library-Mirror-2-Electric-Boogaloo`](https://github.com/h0witzer/Onshape-Standard-Library-Mirror-2-Electric-Boogaloo)
+> instead. That maintained mirror updates through a logged-in browser session
+> and does not consume annual Onshape developer API allocation.
+
+This branch contains the retired automation that previously maintained the `main` branch of
 [`gatrall/onshape-std-library-mirror`](https://github.com/gatrall/onshape-std-library-mirror).
 
 The `main` branch preserves the historical release commits inherited from
-`javawizard/onshape-std-library-mirror`. This automation checks the official
-[Onshape changelog](https://www.onshape.com/en/changelog/) each Friday, imports
-only named standard-library releases, and reports unversioned workspace drift.
+`javawizard/onshape-std-library-mirror`. The retired automation checked the
+official [Onshape changelog](https://www.onshape.com/en/changelog/) each Friday,
+imported only named standard-library releases, and reported unversioned
+workspace drift.
+
+The workflow was manually disabled on 2026-08-21. Do not re-enable it or add a
+new API key; migrate consumers to the maintained mirror above.
 
 `without-versions` is retained as historical material and is not updated.
 
